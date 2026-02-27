@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 TOLC CENT@home Takip Botu
 Versiyon: 2.0.0
@@ -20,6 +21,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import hashlib
 
+# Windows encoding fix
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 # Versiyon bilgisi
 VERSION = "2.0.0"
 BOT_NAME = "TOLC CENT@home Tracker"
@@ -32,13 +39,13 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 if not TELEGRAM_BOT_TOKEN or TELEGRAM_BOT_TOKEN == 'your_bot_token_here':
-    print("❌ HATA: TELEGRAM_BOT_TOKEN ayarlanmamış!")
-    print("📝 Lütfen .env dosyasını düzenleyin ve bot token'ınızı girin.")
+    print("HATA: TELEGRAM_BOT_TOKEN ayarlanmamış!")
+    print("Lütfen .env dosyasını düzenleyin ve bot token'ınızı girin.")
     sys.exit(1)
 
 if not TELEGRAM_CHAT_ID or TELEGRAM_CHAT_ID == 'your_chat_id_here':
-    print("❌ HATA: TELEGRAM_CHAT_ID ayarlanmamış!")
-    print("📝 Lütfen .env dosyasını düzenleyin ve chat ID'nizi girin.")
+    print("HATA: TELEGRAM_CHAT_ID ayarlanmamış!")
+    print("Lütfen .env dosyasını düzenleyin ve chat ID'nizi girin.")
     sys.exit(1)
 
 # Opsiyonel ayarlar
@@ -63,6 +70,10 @@ LOG_DIR.mkdir(exist_ok=True)
 log_level = logging.DEBUG if VERBOSE_LOGGING else logging.INFO
 log_format = '%(asctime)s - [%(levelname)s] - %(funcName)s - %(message)s'
 
+# StreamHandler için encoding ayarı
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter(log_format))
+
 logging.basicConfig(
     level=log_level,
     format=log_format,
@@ -71,7 +82,7 @@ logging.basicConfig(
             LOG_DIR / f'tolc_bot_{datetime.now().strftime("%Y%m%d")}.log',
             encoding='utf-8'
         ),
-        logging.StreamHandler()
+        stream_handler
     ]
 )
 logger = logging.getLogger(__name__)
@@ -105,27 +116,27 @@ def signal_handler(signum, frame):
 
 def validate_config() -> bool:
     """Konfigürasyonu doğrula"""
-    logger.info("🔍 Konfigürasyon doğrulanıyor...")
+    logger.info(" Konfigürasyon doğrulanıyor...")
     
     issues = []
     
     if CHECK_INTERVAL < 60:
-        issues.append("⚠️ CHECK_INTERVAL çok düşük (min: 60 saniye)")
+        issues.append("CHECK_INTERVAL çok düşük (min: 60 saniye)")
     
     if CHECK_INTERVAL > 3600:
-        issues.append("⚠️ CHECK_INTERVAL çok yüksek (max: 3600 saniye)")
+        issues.append("CHECK_INTERVAL çok yüksek (max: 3600 saniye)")
     
     if issues:
         for issue in issues:
             logger.warning(issue)
         return False
     
-    logger.info("✅ Konfigürasyon geçerli")
+    logger.info(" Konfigürasyon geçerli")
     return True
 
 def test_telegram_connection() -> bool:
     """Telegram bağlantısını test et"""
-    logger.info("🔍 Telegram bağlantısı test ediliyor...")
+    logger.info(" Telegram bağlantısı test ediliyor...")
     
     try:
         url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe'
@@ -135,19 +146,19 @@ def test_telegram_connection() -> bool:
         data = response.json()
         if data.get('ok'):
             bot_info = data.get('result', {})
-            logger.info(f"✅ Telegram bağlantısı başarılı: @{bot_info.get('username')}")
+            logger.info(f"Telegram baglantisi basarili: @{bot_info.get('username')}")
             return True
         else:
-            logger.error(f"❌ Telegram API hatası: {data}")
+            logger.error(f" Telegram API hatası: {data}")
             return False
             
     except Exception as e:
-        logger.error(f"❌ Telegram bağlantı hatası: {e}")
+        logger.error(f" Telegram bağlantı hatası: {e}")
         return False
 
 def test_website_access() -> bool:
     """Web sitelerine erişimi test et"""
-    logger.info("🔍 Web siteleri test ediliyor...")
+    logger.info(" Web siteleri test ediliyor...")
     
     all_ok = True
     for url in URLS:
@@ -155,9 +166,9 @@ def test_website_access() -> bool:
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
-            logger.info(f"✅ {lang} sitesi erişilebilir")
+            logger.info(f"{lang} sitesi erisilebilir")
         except Exception as e:
-            logger.error(f"❌ {lang} sitesi erişilemedi: {e}")
+            logger.error(f"{lang} sitesi erisilemedi: {e}")
             all_ok = False
     
     return all_ok
@@ -168,10 +179,10 @@ def load_state() -> Dict:
         if STATE_FILE.exists():
             with open(STATE_FILE, 'r', encoding='utf-8') as f:
                 state = json.load(f)
-                logger.info(f"✅ Durum dosyası yüklendi: {STATE_FILE}")
+                logger.info(f"Durum dosyasi yuklendi: {STATE_FILE}")
                 return state
     except Exception as e:
-        logger.warning(f"⚠️ Durum dosyası yüklenemedi: {e}")
+        logger.warning(f"️ Durum dosyası yüklenemedi: {e}")
     return {}
 
 def save_state(state: Dict) -> None:
@@ -180,9 +191,9 @@ def save_state(state: Dict) -> None:
         state['last_update'] = datetime.now().isoformat()
         with open(STATE_FILE, 'w', encoding='utf-8') as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-        logger.debug(f"💾 Durum kaydedildi: {STATE_FILE}")
+        logger.debug(f" Durum kaydedildi: {STATE_FILE}")
     except Exception as e:
-        logger.error(f"❌ Durum dosyası kaydedilemedi: {e}")
+        logger.error(f" Durum dosyası kaydedilemedi: {e}")
 
 def load_history() -> List[Dict]:
     """Sınav geçmişini yükle"""
@@ -191,7 +202,7 @@ def load_history() -> List[Dict]:
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
-        logger.warning(f"⚠️ Geçmiş dosyası yüklenemedi: {e}")
+        logger.warning(f"️ Geçmiş dosyası yüklenemedi: {e}")
     return []
 
 def save_to_history(exam: Dict) -> None:
@@ -216,9 +227,9 @@ def save_to_history(exam: Dict) -> None:
             with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"📝 Sınav geçmişe kaydedildi: {exam_hash}")
+            logger.info(f"Sinav gecmise kaydedildi: {exam_hash}")
     except Exception as e:
-        logger.error(f"❌ Geçmiş kaydedilemedi: {e}")
+        logger.error(f" Geçmiş kaydedilemedi: {e}")
 
 def send_telegram_message(message: str, disable_notification: bool = False, retry: int = 0) -> Optional[Dict]:
     """Telegram'a mesaj gönder (retry mekanizması ile)"""
@@ -238,25 +249,25 @@ def send_telegram_message(message: str, disable_notification: bool = False, retr
         result = response.json()
         if result.get('ok'):
             stats['notifications_sent'] += 1
-            logger.info("✅ Telegram mesajı gönderildi")
+            logger.info(" Telegram mesajı gönderildi")
             return result
         else:
-            logger.error(f"❌ Telegram API hatası: {result}")
+            logger.error(f" Telegram API hatası: {result}")
             return None
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Telegram bağlantı hatası: {e}")
+        logger.error(f" Telegram bağlantı hatası: {e}")
         
         # Retry mekanizması
         if retry < MAX_RETRIES:
             wait_time = (retry + 1) * 2
-            logger.info(f"🔄 {wait_time} saniye sonra tekrar denenecek... ({retry + 1}/{MAX_RETRIES})")
+            logger.info(f"{wait_time} saniye sonra tekrar denenecek... ({retry + 1}/{MAX_RETRIES})")
             time.sleep(wait_time)
             return send_telegram_message(message, disable_notification, retry + 1)
         
         return None
     except Exception as e:
-        logger.error(f"❌ Beklenmeyen Telegram hatası: {e}")
+        logger.error(f" Beklenmeyen Telegram hatası: {e}")
         return None
 
 def send_heartbeat() -> None:
@@ -265,22 +276,22 @@ def send_heartbeat() -> None:
         uptime = datetime.now() - datetime.fromisoformat(stats['start_time'])
         hours = int(uptime.total_seconds() // 3600)
         
-        message = f"""💚 <b>Heartbeat - Bot Aktif</b>
+        message = f"""<b>Heartbeat - Bot Aktif</b>
 
-⏱️ Çalışma süresi: {hours} saat
-🔍 Toplam kontrol: {stats['total_checks']}
-✅ Başarılı: {stats['successful_checks']}
+Çalışma süresi: {hours} saat
+Toplam kontrol: {stats['total_checks']}
+Başarılı: {stats['successful_checks']}
 📊 Başarı oranı: {(stats['successful_checks'] / stats['total_checks'] * 100) if stats['total_checks'] > 0 else 0:.1f}%
-🎯 Bulunan sınav: {stats['exams_found']}
+Bulunan sınav: {stats['exams_found']}
 
 Bot sorunsuz çalışıyor! ✨"""
         
         send_telegram_message(message, disable_notification=True)
         stats['last_heartbeat'] = datetime.now().isoformat()
-        logger.info("💚 Heartbeat gönderildi")
+        logger.info(" Heartbeat gönderildi")
         
     except Exception as e:
-        logger.error(f"❌ Heartbeat hatası: {e}")
+        logger.error(f" Heartbeat hatası: {e}")
 
 def check_availability() -> Tuple[bool, List[Dict]]:
     """Sınav yerlerini kontrol et (gelişmiş hata yönetimi ile)"""
@@ -306,7 +317,7 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                     'Pragma': 'no-cache'
                 }
                 
-                logger.debug(f"🔍 Kontrol ediliyor: {lang} - {url} (Deneme: {retry_count + 1})")
+                logger.debug(f" Kontrol ediliyor: {lang} - {url} (Deneme: {retry_count + 1})")
                 
                 response = requests.get(url, headers=headers, timeout=30)
                 response.raise_for_status()
@@ -319,17 +330,17 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                 
                 # Tüm sınav satırlarını kontrol et
                 rows = soup.find_all('tr')
-                logger.debug(f"📋 {lang} sitesinde {len(rows)} satır bulundu")
+                logger.debug(f" {lang} sitesinde {len(rows)} satır bulundu")
                 
                 if len(rows) == 0:
-                    logger.warning(f"⚠️ {lang} sitesinde tablo bulunamadı")
+                    logger.warning(f"️ {lang} sitesinde tablo bulunamadı")
                 
                 for row in rows:
                     text = row.get_text().lower()
                     
                     # CENT@home içeren satırları kontrol et
                     if 'cent@home' in text or 'cent @ home' in text:
-                        logger.debug(f"🎯 CENT@home satırı bulundu: {text[:100]}")
+                        logger.debug(f" CENT@home satırı bulundu: {text[:100]}")
                         
                         # Negatif durumları kontrol et (genişletilmiş liste)
                         negative_phrases = [
@@ -375,13 +386,13 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                             # Geçmişe kaydet
                             save_to_history(exam_data)
                             
-                            logger.info(f"✅ Yer bulundu! ({lang}): {date_info}")
+                            logger.info(f"Yer bulundu! ({lang}): {date_info}")
                 
                 stats['successful_checks'] += 1
                 break  # Başarılı, döngüden çık
             
             except requests.exceptions.Timeout:
-                error_msg = f"⏱️ Zaman aşımı ({lang})"
+                error_msg = f"Zaman aşımı ({lang})"
                 logger.warning(error_msg)
                 retry_count += 1
                 if retry_count <= MAX_RETRIES:
@@ -391,7 +402,7 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                     stats['failed_checks'] += 1
                     
             except requests.exceptions.RequestException as e:
-                error_msg = f"🌐 Bağlantı hatası ({lang}): {str(e)}"
+                error_msg = f"Bağlantı hatası ({lang}): {str(e)}"
                 logger.error(error_msg)
                 retry_count += 1
                 if retry_count <= MAX_RETRIES:
@@ -401,7 +412,7 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                     stats['failed_checks'] += 1
                     
             except Exception as e:
-                error_msg = f"❌ Kontrol hatası ({lang}): {str(e)}"
+                error_msg = f"Kontrol hatası ({lang}): {str(e)}"
                 logger.error(error_msg, exc_info=VERBOSE_LOGGING)
                 retry_count += 1
                 if retry_count <= MAX_RETRIES:
@@ -411,14 +422,14 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                     stats['failed_checks'] += 1
     
     check_duration = time.time() - check_start_time
-    logger.debug(f"⏱️ Kontrol süresi: {check_duration:.2f} saniye")
+    logger.debug(f"Kontrol süresi: {check_duration:.2f} saniye")
     
     # Hata bildirimi
     if errors and NOTIFY_ON_ERROR:
-        error_message = f"⚠️ <b>Kontrol Hatası</b>\n\n"
+        error_message = f"<b>Kontrol Hatası</b>\n\n"
         error_message += f"⏰ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
         error_message += "\n".join(errors)
-        error_message += f"\n\n🔄 Sonraki kontrol: {CHECK_INTERVAL} saniye sonra"
+        error_message += f"\n\nSonraki kontrol: {CHECK_INTERVAL} saniye sonra"
         send_telegram_message(error_message, disable_notification=True)
     
     return len(all_available_exams) > 0, all_available_exams
@@ -433,10 +444,10 @@ def format_stats():
     
     return f"""
 📊 <b>İstatistikler</b>
-⏱️ Çalışma süresi: {hours}s {minutes}d
-🔍 Toplam kontrol: {stats['total_checks']}
-✅ Başarılı: {stats['successful_checks']}
-❌ Başarısız: {stats['failed_checks']}
+Çalışma süresi: {hours}s {minutes}d
+Toplam kontrol: {stats['total_checks']}
+Başarılı: {stats['successful_checks']}
+Başarısız: {stats['failed_checks']}
 📨 Bildirim: {stats['notifications_sent']}
 📈 Başarı oranı: {success_rate:.1f}%
 """
@@ -452,58 +463,69 @@ def format_stats() -> str:
     return f"""
 📊 <b>İstatistikler</b>
 ━━━━━━━━━━━━━━━━━━━━
-⏱️ Çalışma süresi: {hours}s {minutes}d
-🔍 Toplam kontrol: {stats['total_checks']}
-✅ Başarılı: {stats['successful_checks']}
-❌ Başarısız: {stats['failed_checks']}
+Çalışma süresi: {hours}s {minutes}d
+Toplam kontrol: {stats['total_checks']}
+Başarılı: {stats['successful_checks']}
+Başarısız: {stats['failed_checks']}
 📨 Bildirim: {stats['notifications_sent']}
-🎯 Bulunan sınav: {stats['exams_found']}
+Bulunan sınav: {stats['exams_found']}
 📈 Başarı oranı: {success_rate:.1f}%
 ━━━━━━━━━━━━━━━━━━━━
-🤖 Versiyon: {VERSION}
+Versiyon: {VERSION}
 """
+
+def safe_print(text: str) -> None:
+    """Güvenli print - Windows encoding sorunlarını önler"""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        # Emoji'leri kaldır ve tekrar dene
+        import re
+        text_no_emoji = re.sub(r'[^\x00-\x7F]+', '', text)
+        print(text_no_emoji)
 
 def main():
     """Ana döngü"""
     global shutdown_requested
     
-    # Sinyal yakalayıcıları ayarla
+    # Sinyal yakalayıcıları ayarla (Windows'ta SIGTERM yok)
     signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, signal_handler)
     
     # Banner
-    print("=" * 70)
-    print(f"🎓 {BOT_NAME} v{VERSION}")
-    print("=" * 70)
+    safe_print("=" * 70)
+    safe_print(f"{BOT_NAME} v{VERSION}")
+    safe_print("=" * 70)
     
     logger.info("=" * 70)
-    logger.info(f"🤖 {BOT_NAME} v{VERSION} başlatıldı")
+    logger.info(f"Bot {BOT_NAME} v{VERSION} baslatildi")
     logger.info("=" * 70)
     
     # Konfigürasyon doğrulama
     if not validate_config():
-        logger.warning("⚠️ Konfigürasyon uyarıları var, devam ediliyor...")
+        logger.warning("Konfigurasyon uyarilari var, devam ediliyor...")
     
     # Bağlantı testleri
     if not test_telegram_connection():
-        logger.error("❌ Telegram bağlantısı başarısız! Bot durduruluyor.")
+        logger.error("Telegram baglantisi basarisiz! Bot durduruluyor.")
         sys.exit(1)
     
     if not test_website_access():
-        logger.warning("⚠️ Bazı web sitelerine erişilemiyor, devam ediliyor...")
+        logger.warning("Bazi web sitelerine erisilemiyor, devam ediliyor...")
     
     # Ayarları logla
     logger.info(f"� Kontrol edilen siteler:")
     for url in URLS:
-        lang = 'İngilizce' if 'inglese' in url else 'İtalyanca'
+        lang = 'Ingilizce' if 'inglese' in url else 'Italyanca'
         logger.info(f"   - {lang}: {url}")
-    logger.info(f"⏱️  Kontrol aralığı: {CHECK_INTERVAL} saniye")
-    logger.info(f"💚 Heartbeat aralığı: {HEARTBEAT_INTERVAL} saniye")
-    logger.info(f"🔔 Bildirim sesi: {'Açık' if NOTIFICATION_SOUND else 'Kapalı'}")
-    logger.info(f"📝 Detaylı log: {'Açık' if VERBOSE_LOGGING else 'Kapalı'}")
-    logger.info(f"⚠️  Hata bildirimi: {'Açık' if NOTIFY_ON_ERROR else 'Kapalı'}")
-    logger.info(f"🔄 Maksimum retry: {MAX_RETRIES}")
-    logger.info(f"🧪 Test modu: {'Açık' if TEST_MODE else 'Kapalı'}")
+    logger.info(f"Kontrol araligi: {CHECK_INTERVAL} saniye")
+    logger.info(f"Heartbeat araligi: {HEARTBEAT_INTERVAL} saniye")
+    logger.info(f"Bildirim sesi: {'Acik' if NOTIFICATION_SOUND else 'Kapali'}")
+    logger.info(f"Detayli log: {'Acik' if VERBOSE_LOGGING else 'Kapali'}")
+    logger.info(f"Hata bildirimi: {'Acik' if NOTIFY_ON_ERROR else 'Kapali'}")
+    logger.info(f"Maksimum retry: {MAX_RETRIES}")
+    logger.info(f"Test modu: {'Acik' if TEST_MODE else 'Kapali'}")
     logger.info("=" * 70)
     
     # Önceki durumu yükle
@@ -514,11 +536,11 @@ def main():
     # Başlangıç mesajı
     start_msg = f"""🚀 <b>{BOT_NAME} Başlatıldı</b>
 
-🤖 Versiyon: {VERSION}
-📍 İngilizce ve İtalyanca siteler kontrol ediliyor
-⏱️ Kontrol aralığı: {CHECK_INTERVAL} saniye
-💚 Heartbeat: Her {HEARTBEAT_INTERVAL // 60} dakikada bir
-🔔 Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
+Versiyon: {VERSION}
+İngilizce ve İtalyanca siteler kontrol ediliyor
+Kontrol aralığı: {CHECK_INTERVAL} saniye
+Heartbeat: Her {HEARTBEAT_INTERVAL // 60} dakikada bir
+Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
 � Otomatik retry: {MAX_RETRIES} deneme
 
 ✨ Bot başarıyla başlatıldı ve çalışıyor!"""
@@ -530,9 +552,9 @@ def main():
     
     # Test modu
     if TEST_MODE:
-        logger.info("🧪 TEST MODU: Tek kontrol yapılıp çıkılacak")
+        logger.info("TEST MODU: Tek kontrol yapilip cikilacak")
         available, exams = check_availability()
-        logger.info(f"Test sonucu: {'Yer var' if available else 'Yer yok'} ({len(exams)} sınav)")
+        logger.info(f"Test sonucu: {'Yer var' if available else 'Yer yok'} ({len(exams)} sinav)")
         return
     
     while not shutdown_requested:
@@ -559,7 +581,7 @@ def main():
                 message += "⚡ <b>Hızlı ol, yerler çabuk dolabilir!</b>"
                 
                 send_telegram_message(message)
-                logger.info(f"✅ Yer bulundu! {len(exams)} sınav için bildirim gönderildi.")
+                logger.info(f"Yer bulundu! {len(exams)} sinav icin bildirim gonderildi.")
                 last_status = True
                 consecutive_errors = 0
                 
@@ -572,14 +594,14 @@ def main():
             
             elif not available and last_status:
                 # Yerler doldu
-                message = "❌ <b>Yerler Doldu</b>\n\n"
+                message = "<b>Yerler Doldu</b>\n\n"
                 message += f"⏰ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
                 message += "CENT@home sınavlarında şu an yer yok.\n"
-                message += "🔍 Takip devam ediyor..."
+                message += "Takip devam ediyor..."
                 
                 send_telegram_message(message, disable_notification=True)
                 last_status = False
-                logger.info("❌ Yerler doldu, takip devam ediyor.")
+                logger.info("Yerler doldu, takip devam ediyor.")
                 
                 save_state({
                     'last_available': False,
@@ -587,9 +609,9 @@ def main():
                 })
             
             elif available:
-                logger.info(f"✅ Hala yer mevcut ({len(exams)} sınav)")
+                logger.info(f"Hala yer mevcut ({len(exams)} sinav)")
             else:
-                logger.info("❌ Yer yok, takip devam ediyor")
+                logger.info("Yer yok, takip devam ediyor")
             
             # Heartbeat kontrolü
             if (datetime.now() - last_heartbeat_time).total_seconds() >= HEARTBEAT_INTERVAL:
@@ -605,12 +627,12 @@ def main():
                 time.sleep(1)
             
         except KeyboardInterrupt:
-            logger.info("\n\n👋 Bot durduruldu (Kullanıcı isteği - Ctrl+C)")
+            logger.info("\n\nBot durduruldu (Kullanici istegi - Ctrl+C)")
             shutdown_requested = True
             
         except Exception as e:
             consecutive_errors += 1
-            logger.error(f"❌ Beklenmeyen hata: {e}", exc_info=True)
+            logger.error(f"Beklenmeyen hata: {e}", exc_info=True)
             
             if consecutive_errors >= max_consecutive_errors:
                 error_msg = f"""🚨 <b>Kritik Hata!</b>
@@ -618,7 +640,7 @@ def main():
 Art arda {max_consecutive_errors} hata oluştu.
 Bot güvenlik nedeniyle durduruluyor.
 
-❌ Son hata: {str(e)[:200]}
+Son hata: {str(e)[:200]}
 
 {format_stats()}"""
                 send_telegram_message(error_msg)
@@ -627,16 +649,16 @@ Bot güvenlik nedeniyle durduruluyor.
             
             # Hata sonrası bekleme
             wait_time = min(CHECK_INTERVAL, 60 * consecutive_errors)
-            logger.info(f"⏳ {wait_time} saniye bekleniyor...")
+            logger.info(f"{wait_time} saniye bekleniyor...")
             time.sleep(wait_time)
     
     # Temiz kapanış
-    logger.info("🛑 Bot kapatılıyor...")
+    logger.info("Bot kapatiliyor...")
     
     # Son istatistikler
     stats['uptime_seconds'] = (datetime.now() - datetime.fromisoformat(stats['start_time'])).total_seconds()
     
-    stop_msg = f"""👋 <b>Bot Durduruldu</b>
+    stop_msg = f"""<b>Bot Durduruldu</b>
 
 ⏰ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 
@@ -655,12 +677,12 @@ Görüşmek üzere! 👋"""
     })
     
     logger.info("=" * 70)
-    logger.info("✅ Bot başarıyla kapatıldı")
+    logger.info("Bot basariyla kapatildi")
     logger.info("=" * 70)
 
 if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        logger.critical(f"💥 Kritik hata: {e}", exc_info=True)
+        logger.critical(f"Kritik hata: {e}", exc_info=True)
         sys.exit(1)
