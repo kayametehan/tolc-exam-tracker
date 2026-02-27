@@ -326,7 +326,7 @@ def check_availability() -> Tuple[bool, List[Dict]]:
                 if len(response.content) < 1000:
                     raise ValueError("Sayfa içeriği çok kısa, geçersiz yanıt olabilir")
                 
-                soup = BeautifulSoup(response.text, 'lxml')
+                soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Tüm sınav satırlarını kontrol et
                 rows = soup.find_all('tr')
