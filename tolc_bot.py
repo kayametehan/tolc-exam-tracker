@@ -32,7 +32,7 @@ VERSION = "2.0.0"
 BOT_NAME = "TOLC CENT@home Tracker"
 
 # Konfigürasyon
-load_dotenv()
+load_dotenv(override=True)  # Environment variable'ları override et
 
 # Zorunlu ayarlar kontrolü
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
