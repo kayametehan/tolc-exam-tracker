@@ -9,6 +9,17 @@
 - 🔔 Anında Telegram bildirimi
 - 📅 Detaylı tarih/saat bilgisi
 - 🌐 Çoklu dil desteği
+- 🎓 Direkt kayıt butonları
+
+### Telegram Komutları 📱
+- `/start` - Bot'u başlat ve bilgi al
+- `/status` - Anlık durum ve istatistikler
+- `/check` - Manuel kontrol (hemen kontrol et)
+- `/stats` - Detaylı istatistikler ve geçmiş
+- `/help` - Yardım menüsü
+- `/stop` - Bot'u durdur
+
+[Komutlar Rehberi →](COMMANDS.md)
 
 ### Güvenilirlik
 - 🔄 Otomatik yeniden deneme mekanizması (3 deneme)
