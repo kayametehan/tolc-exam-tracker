@@ -93,6 +93,7 @@ HISTORY_FILE = LOG_DIR / 'exam_history.json'
 
 # Global değişkenler
 shutdown_requested = False
+processed_message_ids = set()  # İşlenmiş mesaj ID'lerini takip et
 
 # İstatistikler
 stats = {
@@ -324,6 +325,18 @@ def handle_command(message: Dict) -> None:
         text = message.get('text', '').strip()
         chat_id = message.get('chat', {}).get('id')
         message_id = message.get('message_id')
+        
+        # Mesaj daha önce işlendi mi kontrol et
+        if message_id in processed_message_ids:
+            logger.debug(f"Mesaj zaten islendi, atlanıyor: {message_id}")
+            return
+        
+        # Mesajı işlenmiş olarak işaretle
+        processed_message_ids.add(message_id)
+        
+        # Eski mesajları temizle (son 100'ü tut)
+        if len(processed_message_ids) > 100:
+            processed_message_ids.clear()
         
         logger.info(f"Komut alindi: {text} (message_id: {message_id})")
         
