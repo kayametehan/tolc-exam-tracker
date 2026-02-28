@@ -828,19 +828,9 @@ Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
                 send_heartbeat()
                 last_heartbeat_time = datetime.now()
             
-            # Telegram komutlarını kontrol et
-            try:
-                updates = get_telegram_updates(last_update_id + 1)
-                for update in updates:
-                    last_update_id = max(last_update_id, update.get('update_id', 0))
-                    if 'message' in update:
-                        handle_command(update['message'])
-            except Exception as e:
-                logger.debug(f"Komut kontrolu hatasi: {e}")
-            
             consecutive_errors = 0
             
-            # Bekleme (her saniye komut kontrolü yap)
+            # Bekleme (her 10 saniyede bir komut kontrolü yap)
             for i in range(CHECK_INTERVAL):
                 if shutdown_requested:
                     break
