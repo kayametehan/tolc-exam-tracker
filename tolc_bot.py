@@ -231,7 +231,7 @@ def save_to_history(exam: Dict) -> None:
     except Exception as e:
         logger.error(f" Geçmiş kaydedilemedi: {e}")
 
-def send_telegram_message(message: str, disable_notification: bool = False, retry: int = 0) -> Optional[Dict]:
+def send_telegram_message(message: str, disable_notification: bool = False, retry: int = 0, reply_markup: Optional[Dict] = None) -> Optional[Dict]:
     """Telegram'a mesaj gönder (retry mekanizması ile)"""
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
     data = {
@@ -239,8 +239,11 @@ def send_telegram_message(message: str, disable_notification: bool = False, retr
         'text': message,
         'parse_mode': 'HTML',
         'disable_notification': disable_notification or not NOTIFICATION_SOUND,
-        'disable_web_page_preview': True
+        'disable_web_page_preview': False  # Link preview'ı göster
     }
+    
+    if reply_markup:
+        data['reply_markup'] = json.dumps(reply_markup)
     
     try:
         response = requests.post(url, data=data, timeout=10)
@@ -572,15 +575,30 @@ Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
                 message += f"━━━━━━━━━━━━━━━━━━━━\n\n"
                 message += f"<b>CENT@home sınavında {len(exams)} yer mevcut:</b>\n\n"
                 
+                # Butonlar için inline keyboard oluştur
+                buttons = []
+                
                 for i, exam in enumerate(exams, 1):
                     message += f"<b>{i}. {exam['lang']}</b>\n"
-                    message += f"📅 {exam['date_info']}\n"
-                    message += f"🔗 <a href=\"{exam['url']}\">Hemen kayıt ol!</a>\n\n"
+                    message += f"📅 {exam['date_info']}\n\n"
+                    
+                    # Her sınav için buton ekle
+                    button_text = f"🎓 {exam['lang']} - Kayıt Ol"
+                    buttons.append([{
+                        'text': button_text,
+                        'url': exam['url']
+                    }])
                 
                 message += "━━━━━━━━━━━━━━━━━━━━\n"
-                message += "⚡ <b>Hızlı ol, yerler çabuk dolabilir!</b>"
+                message += "⚡ <b>Hızlı ol, yerler çabuk dolabilir!</b>\n\n"
+                message += "👇 Aşağıdaki butonlardan direkt kayıt olabilirsiniz!"
                 
-                send_telegram_message(message)
+                # Inline keyboard markup
+                reply_markup = {
+                    'inline_keyboard': buttons
+                }
+                
+                send_telegram_message(message, reply_markup=reply_markup)
                 logger.info(f"Yer bulundu! {len(exams)} sinav icin bildirim gonderildi.")
                 last_status = True
                 consecutive_errors = 0
