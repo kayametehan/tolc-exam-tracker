@@ -284,17 +284,208 @@ def send_heartbeat() -> None:
 Çalışma süresi: {hours} saat
 Toplam kontrol: {stats['total_checks']}
 Başarılı: {stats['successful_checks']}
-📊 Başarı oranı: {(stats['successful_checks'] / stats['total_checks'] * 100) if stats['total_checks'] > 0 else 0:.1f}%
+Başarı oranı: {(stats['successful_checks'] / stats['total_checks'] * 100) if stats['total_checks'] > 0 else 0:.1f}%
 Bulunan sınav: {stats['exams_found']}
 
-Bot sorunsuz çalışıyor! ✨"""
+Bot sorunsuz çalışıyor!"""
         
         send_telegram_message(message, disable_notification=True)
         stats['last_heartbeat'] = datetime.now().isoformat()
-        logger.info(" Heartbeat gönderildi")
+        logger.info("Heartbeat gonderildi")
         
     except Exception as e:
-        logger.error(f" Heartbeat hatası: {e}")
+        logger.error(f"Heartbeat hatasi: {e}")
+
+def get_telegram_updates(offset: int = 0) -> List[Dict]:
+    """Telegram güncellemelerini al (komutlar için)"""
+    try:
+        url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates'
+        params = {
+            'offset': offset,
+            'timeout': 1,
+            'allowed_updates': ['message']
+        }
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        
+        result = response.json()
+        if result.get('ok'):
+            return result.get('result', [])
+        return []
+    except Exception as e:
+        logger.debug(f"Telegram updates hatasi: {e}")
+        return []
+
+def handle_command(message: Dict) -> None:
+    """Telegram komutlarını işle"""
+    try:
+        text = message.get('text', '').strip()
+        chat_id = message.get('chat', {}).get('id')
+        
+        # Sadece kayıtlı chat ID'den komut kabul et
+        if str(chat_id) != str(TELEGRAM_CHAT_ID):
+            return
+        
+        if text == '/start':
+            response = f"""<b>TOLC CENT@home Tracker Bot</b>
+
+Hos geldiniz! Bu bot TOLC CENT@home sinavlarini takip eder.
+
+<b>Komutlar:</b>
+/status - Bot durumu ve istatistikler
+/check - Simdi kontrol et
+/stats - Detayli istatistikler
+/help - Yardim menusu
+/stop - Botu durdur
+
+Bot otomatik olarak her {CHECK_INTERVAL // 60} dakikada bir kontrol yapar."""
+            send_telegram_message(response)
+            
+        elif text == '/status':
+            uptime = datetime.now() - datetime.fromisoformat(stats['start_time'])
+            hours = int(uptime.total_seconds() // 3600)
+            minutes = int((uptime.total_seconds() % 3600) // 60)
+            
+            success_rate = (stats['successful_checks'] / stats['total_checks'] * 100) if stats['total_checks'] > 0 else 0
+            
+            response = f"""<b>Bot Durumu</b>
+
+<b>Durum:</b> Aktif ve calisiyor
+<b>Calisma suresi:</b> {hours}s {minutes}d
+<b>Toplam kontrol:</b> {stats['total_checks']}
+<b>Basarili:</b> {stats['successful_checks']}
+<b>Basarisiz:</b> {stats['failed_checks']}
+<b>Basari orani:</b> {success_rate:.1f}%
+<b>Bulunan sinav:</b> {stats['exams_found']}
+<b>Bildirim:</b> {stats['notifications_sent']}
+
+<b>Son kontrol:</b> {datetime.now().strftime('%H:%M:%S')}
+<b>Sonraki kontrol:</b> {CHECK_INTERVAL // 60} dakika sonra"""
+            
+            send_telegram_message(response)
+            
+        elif text == '/check':
+            response = "<b>Manuel Kontrol Baslatildi</b>\n\nSinavlar kontrol ediliyor..."
+            send_telegram_message(response, disable_notification=True)
+            
+            available, exams = check_availability()
+            
+            if available:
+                message = f"<b>Yer Bulundu!</b>\n\n{len(exams)} sinav icin yer mevcut:\n\n"
+                buttons = []
+                
+                for i, exam in enumerate(exams, 1):
+                    message += f"<b>{i}. {exam['lang']}</b>\n"
+                    message += f"{exam['date_info']}\n\n"
+                    
+                    buttons.append([{
+                        'text': f"{exam['lang']} - Kayit Ol",
+                        'url': exam['url']
+                    }])
+                
+                reply_markup = {'inline_keyboard': buttons}
+                send_telegram_message(message, reply_markup=reply_markup)
+            else:
+                send_telegram_message("<b>Yer Yok</b>\n\nSu an hicbir sinavda yer bulunmuyor.\nTakip devam ediyor...")
+                
+        elif text == '/stats':
+            uptime = datetime.now() - datetime.fromisoformat(stats['start_time'])
+            hours = int(uptime.total_seconds() // 3600)
+            minutes = int((uptime.total_seconds() % 3600) // 60)
+            
+            success_rate = (stats['successful_checks'] / stats['total_checks'] * 100) if stats['total_checks'] > 0 else 0
+            
+            # Geçmişten son 5 sınavı al
+            history = load_history()
+            recent_exams = history[-5:] if history else []
+            
+            response = f"""<b>Detayli Istatistikler</b>
+
+<b>Calisma Suresi:</b> {hours}s {minutes}d
+<b>Toplam Kontrol:</b> {stats['total_checks']}
+<b>Basarili:</b> {stats['successful_checks']}
+<b>Basarisiz:</b> {stats['failed_checks']}
+<b>Basari Orani:</b> {success_rate:.1f}%
+<b>Bulunan Sinav:</b> {stats['exams_found']}
+<b>Gonderilen Bildirim:</b> {stats['notifications_sent']}
+
+<b>Ayarlar:</b>
+Kontrol araligi: {CHECK_INTERVAL // 60} dakika
+Heartbeat: {HEARTBEAT_INTERVAL // 3600} saat
+Bildirim sesi: {'Acik' if NOTIFICATION_SOUND else 'Kapali'}
+
+<b>Versiyon:</b> {VERSION}"""
+            
+            if recent_exams:
+                response += "\n\n<b>Son Bulunan Sinavlar:</b>\n"
+                for exam in recent_exams:
+                    response += f"• {exam.get('lang', 'N/A')} - {exam.get('date_info', 'N/A')[:50]}\n"
+            
+            send_telegram_message(response)
+            
+        elif text == '/help':
+            response = f"""<b>Yardim Menusu</b>
+
+<b>Komutlar:</b>
+
+/start - Botu baslat ve hos geldin mesaji
+/status - Bot durumu ve anlik istatistikler
+/check - Manuel kontrol yap (hemen kontrol et)
+/stats - Detayli istatistikler ve gecmis
+/help - Bu yardim menusu
+/stop - Botu durdur (dikkatli kullanin!)
+
+<b>Bot Nasil Calisir?</b>
+
+Bot her {CHECK_INTERVAL // 60} dakikada bir otomatik olarak TOLC CENT@home sinavlarini kontrol eder. Yer acildiginda size aninda bildirim gonderir.
+
+<b>Ozellikler:</b>
+• Ingilizce ve Italyanca siteler
+• Aninda bildirim
+• Direkt kayit butonlari
+• Detayli istatistikler
+• Heartbeat sistemi
+
+<b>Destek:</b>
+GitHub: https://github.com/kayametehan/tolc-exam-tracker"""
+            
+            send_telegram_message(response)
+            
+        elif text == '/stop':
+            response = """<b>Bot Durdurma</b>
+
+Bot'u durdurmak istediginizden emin misiniz?
+
+Not: Bot'u tekrar baslatmak icin sunucuya erisim gerekir.
+
+Durdurmak icin: /stop_confirm
+Iptal icin: /cancel"""
+            
+            send_telegram_message(response)
+            
+        elif text == '/stop_confirm':
+            global shutdown_requested
+            
+            response = f"""<b>Bot Durduruluyor</b>
+
+{format_stats()}
+
+Gorusmek uzere!"""
+            
+            send_telegram_message(response)
+            shutdown_requested = True
+            logger.info("Bot kullanici komutuyla durduruldu")
+            
+        elif text == '/cancel':
+            send_telegram_message("Islem iptal edildi.")
+            
+        else:
+            # Bilinmeyen komut
+            if text.startswith('/'):
+                send_telegram_message(f"Bilinmeyen komut: {text}\n\nKomutlari gormek icin /help yazin.")
+                
+    except Exception as e:
+        logger.error(f"Komut isleme hatasi: {e}", exc_info=True)
 
 def check_availability() -> Tuple[bool, List[Dict]]:
     """Sınav yerlerini kontrol et (gelişmiş hata yönetimi ile)"""
@@ -535,6 +726,7 @@ def main():
     state = load_state()
     last_status = state.get('last_available', False)
     last_heartbeat_time = datetime.now()
+    last_update_id = 0  # Telegram komutları için
     
     # Başlangıç mesajı
     start_msg = f"""🚀 <b>{BOT_NAME} Başlatıldı</b>
@@ -636,12 +828,34 @@ Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
                 send_heartbeat()
                 last_heartbeat_time = datetime.now()
             
+            # Telegram komutlarını kontrol et
+            try:
+                updates = get_telegram_updates(last_update_id + 1)
+                for update in updates:
+                    last_update_id = max(last_update_id, update.get('update_id', 0))
+                    if 'message' in update:
+                        handle_command(update['message'])
+            except Exception as e:
+                logger.debug(f"Komut kontrolu hatasi: {e}")
+            
             consecutive_errors = 0
             
-            # Bekleme
+            # Bekleme (her saniye komut kontrolü yap)
             for i in range(CHECK_INTERVAL):
                 if shutdown_requested:
                     break
+                
+                # Her 10 saniyede bir komut kontrol et
+                if i % 10 == 0:
+                    try:
+                        updates = get_telegram_updates(last_update_id + 1)
+                        for update in updates:
+                            last_update_id = max(last_update_id, update.get('update_id', 0))
+                            if 'message' in update:
+                                handle_command(update['message'])
+                    except:
+                        pass
+                
                 time.sleep(1)
             
         except KeyboardInterrupt:
