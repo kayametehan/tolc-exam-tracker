@@ -310,7 +310,9 @@ def get_telegram_updates(offset: int = 0) -> List[Dict]:
         
         result = response.json()
         if result.get('ok'):
-            return result.get('result', [])
+            updates = result.get('result', [])
+            logger.debug(f"Telegram updates alindi: {len(updates)} update, offset: {offset}")
+            return updates
         return []
     except Exception as e:
         logger.debug(f"Telegram updates hatasi: {e}")
@@ -321,9 +323,13 @@ def handle_command(message: Dict) -> None:
     try:
         text = message.get('text', '').strip()
         chat_id = message.get('chat', {}).get('id')
+        message_id = message.get('message_id')
+        
+        logger.info(f"Komut alindi: {text} (message_id: {message_id})")
         
         # Sadece kayıtlı chat ID'den komut kabul et
         if str(chat_id) != str(TELEGRAM_CHAT_ID):
+            logger.warning(f"Yetkisiz chat ID: {chat_id}")
             return
         
         if text == '/start':
@@ -840,11 +846,13 @@ Bildirim: {'Açık' if NOTIFICATION_SOUND else 'Sessiz'}
                     try:
                         updates = get_telegram_updates(last_update_id + 1)
                         for update in updates:
-                            last_update_id = max(last_update_id, update.get('update_id', 0))
-                            if 'message' in update:
-                                handle_command(update['message'])
-                    except:
-                        pass
+                            update_id = update.get('update_id', 0)
+                            if update_id > last_update_id:
+                                last_update_id = update_id
+                                if 'message' in update:
+                                    handle_command(update['message'])
+                    except Exception as e:
+                        logger.debug(f"Komut kontrolu hatasi: {e}")
                 
                 time.sleep(1)
             
